@@ -1,7 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 
 app = FastAPI()
@@ -69,3 +70,13 @@ class MovieCreate(BaseModel):
 class ReviewCreate(BaseModel):
     content: str
     rating: float
+
+# Endpoints de la API
+@app.post("/user/")
+def register_user(user: UserCreate, db: Session = Depends(get_db)):
+    db_user = User(email=user.email, password=user.password)
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
