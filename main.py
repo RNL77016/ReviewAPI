@@ -123,3 +123,10 @@ def create_movie(
 @app.get("/movies/")
 def get_movies(db: Session = Depends(get_db)):
     return db.query(Movie).all()
+
+@app.get("/movies/title/{title}")
+def get_movie_by_title(title: str, db: Session = Depends(get_db)):
+    movies = db.query(Movie).filter(Movie.title == title).all()
+    if not movies:
+        raise HTTPException(status_code=404, detail="Movie not found")
+    return movies
