@@ -119,3 +119,7 @@ def create_movie(
     db.commit()
     db.refresh(db_movie)
     return db_movie
+
+@app.get("/movies/")
+def get_movies(db: Session = Depends(get_db)):
+    return db.query(Movie).all()
