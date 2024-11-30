@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, File, UploadFile
 from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship
 from pydantic import BaseModel
@@ -93,3 +93,29 @@ def login_user(user: UserLogin, db: Session = Depends(get_db)):
 def get_users(db: Session = Depends(get_db)):
     return db.query(User).all()
 
+@app.post("/movies/")
+def create_movie(
+    title: str,
+    description: str,
+    year: int,
+    genre: str,
+    rating: float,
+    image: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    image_path = f"images/{image.filename}"
+    with open(image_path, "wb") as buffer:
+        shutil.copyfileobj(image.file, buffer)
+
+    db_movie = Movie(
+        title=title,
+        description=description,
+        year=year,
+        genre=genre,
+        rating=rating,
+        image_url=image_path
+    )
+    db.add(db_movie)
+    db.commit()
+    db.refresh(db_movie)
+    return db_movie
