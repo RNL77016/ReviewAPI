@@ -88,3 +88,8 @@ def login_user(user: UserLogin, db: Session = Depends(get_db)):
     if not db_user or db_user.password != user.password:
         raise HTTPException(status_code=401, detail="Invalid email or password")
     return {"message": "Login successful"}
+
+@app.get("/users/")
+def get_users(db: Session = Depends(get_db)):
+    return db.query(User).all()
+
