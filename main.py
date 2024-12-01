@@ -160,3 +160,35 @@ def delete_movie(movie_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"detail": "Movie deleted"}
 
+@app.post("/movies/{title}/reviews/")
+def create_review(title: str, review: ReviewCreate, db: Session = Depends(get_db)):
+    db_movie = db.query(Movie).filter(Movie.title == title).first()
+    if not db_movie:
+        raise HTTPException(status_code=404, detail="Movie not found")
+    db_review = Review(content=review.content, rating=review.rating, movie_id=db_movie.id)
+    db.add(db_review)
+    db.commit()
+    db.refresh(db_review)
+    return db_review
+
+@app.get("/movies/{title}/reviews/")
+def get_reviews_by_title(title: str, db: Session = Depends(get_db)):
+    db_movie = db.query(Movie).filter(Movie.title == title).first()
+    if not db_movie:
+        raise HTTPException(status_code=404, detail="Movie not found")
+    reviews = db.query(Review).filter(Review.movie_id == db_movie.id).all()
+    return reviews
+
+@app.get("/reviews/")
+def get_all_reviews(db: Session = Depends(get_db)):
+    return db.query(Review).all()
+
+@app.put("/reviews/{review_id}")
+def update_review(review_id: int, review: ReviewCreate, db: Session = Depends(get_db)):
+    db_review = db.query(Review).filter(Review.id == review_id).first()
+    if not db_review:
+        raise HTTPException(status_code=404, detail="Review not found")
+    db_review.content = review.content
+    db_review.rating = review.rating
+    db.commit()
+    return db_review
