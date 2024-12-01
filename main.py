@@ -17,13 +17,13 @@ Base = declarative_base()
 
 # Modelos de base de datos
 class User(Base):
-    _tablename_ = "users"
+    __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True)
     password = Column(String)
 
 class Movie(Base):
-    _tablename_ = "movies"
+    __tablename__ = "movies"
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, unique=True, index=True)
     description = Column(String)
@@ -35,7 +35,7 @@ class Movie(Base):
     reviews = relationship("Review", back_populates="movie")
 
 class Review(Base):
-    _tablename_ = "reviews"
+    __tablename__ = "reviews"
     id = Column(Integer, primary_key=True, index=True)
     content = Column(String)
     rating = Column(Float)
