@@ -80,14 +80,26 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-    return db_user
+    return {
+        "userId": db_user.id,
+        "isLogged": True,
+        "message": "Usuario creado correctamente"
+    }
 
 @app.post("/login/")
 def login_user(user: UserLogin, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.email == user.email).first()
     if not db_user or db_user.password != user.password:
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-    return {"message": "Login successful"}
+        return {
+            "userId": None,
+            "isLogged": False,
+            "message": "Invalid email or password"
+        }
+    return {
+        "userId": db_user.id,
+        "isLogged": True,
+        "message": "Bienvenido"
+    }
 
 @app.get("/users/")
 def get_users(db: Session = Depends(get_db)):
