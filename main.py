@@ -130,3 +130,33 @@ def get_movie_by_title(title: str, db: Session = Depends(get_db)):
     if not movies:
         raise HTTPException(status_code=404, detail="Movie not found")
     return movies
+
+@app.get("/movies/genre/{genre}")
+def get_movie_by_genre(genre: str, db: Session = Depends(get_db)):
+    movies = db.query(Movie).filter(Movie.genre == genre).all()
+    if not movies:
+        raise HTTPException(status_code=404, detail="Movie not found")
+    return movies
+
+@app.put("/movies/{movie_id}")
+def update_movie(movie_id: int, movie: MovieCreate, db: Session = Depends(get_db)):
+    db_movie = db.query(Movie).filter(Movie.id == movie_id).first()
+    if not db_movie:
+        raise HTTPException(status_code=404, detail="Movie not found")
+    db_movie.title = movie.title
+    db_movie.description = movie.description
+    db_movie.year = movie.year
+    db_movie.genre = movie.genre
+    db_movie.rating = movie.rating
+    db.commit()
+    return db_movie
+
+@app.delete("/movies/{movie_id}")
+def delete_movie(movie_id: int, db: Session = Depends(get_db)):
+    db_movie = db.query(Movie).filter(Movie.id == movie_id).first()
+    if not db_movie:
+        raise HTTPException(status_code=404, detail="Movie not found")
+    db.delete(db_movie)
+    db.commit()
+    return {"detail": "Movie deleted"}
+
