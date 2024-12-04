@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, File, UploadFile, Request
+from fastapi import FastAPI, Depends, HTTPException, File, UploadFile, Request, Form
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey
@@ -123,7 +123,11 @@ def get_users(db: Session = Depends(get_db)):
 
 @app.post("/movies/")
 def create_movie(
-    movie: MovieCreate,
+    title: str = Form(...),
+    description: str = Form(...),
+    year: int = Form(...),
+    genre: str = Form(...),
+    rating: float = Form(..., ge=1, le=10),
     image: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
@@ -132,11 +136,11 @@ def create_movie(
         shutil.copyfileobj(image.file, buffer)
 
     db_movie = Movie(
-        title=movie.title,
-        description=movie.description,
-        year=movie.year,
-        genre=movie.genre,
-        rating=movie.rating,
+        title=title,
+        description=description,
+        year=year,
+        genre=genre,
+        rating=rating,
         image_url=f"/images/{image.filename}"
     )
     db.add(db_movie)
@@ -170,17 +174,34 @@ def get_movie_by_genre(genre: str, db: Session = Depends(get_db)):
     return movies
 
 @app.put("/movies/{movie_id}")
-def update_movie(movie_id: int, movie: MovieCreate, db: Session = Depends(get_db)):
+def update_movie(
+    movie_id: int,
+    title: str = Form(...),
+    description: str = Form(...),
+    year: int = Form(...),
+    genre: str = Form(...),
+    rating: float = Form(..., ge=1, le=10),
+    image: UploadFile = File(None),
+    db: Session = Depends(get_db)
+):
     db_movie = db.query(Movie).filter(Movie.id == movie_id).first()
     if not db_movie:
         raise HTTPException(status_code=404, detail="Movie not found")
-    db_movie.title = movie.title
-    db_movie.description = movie.description
-    db_movie.year = movie.year
-    db_movie.genre = movie.genre
-    db_movie.rating = movie.rating
-    db_movie.image_url = movie.image_url
+
+    db_movie.title = title
+    db_movie.description = description
+    db_movie.year = year
+    db_movie.genre = genre
+    db_movie.rating = rating
+
+    if image:
+        image_path = f"images/{image.filename}"
+        with open(image_path, "wb") as buffer:
+            shutil.copyfileobj(image.file, buffer)
+        db_movie.image_url = f"/images/{image.filename}"
+
     db.commit()
+    db.refresh(db_movie)
     return db_movie
 
 @app.delete("/movies/{movie_id}")
@@ -203,13 +224,12 @@ def create_review(title: str, review: ReviewCreate, db: Session = Depends(get_db
     db.refresh(db_review)
     return db_review
 
-app.get("/movies/{movie_id}/reviews/")
-def get_reviews_by_movie_id(movie_id: int, db: Session = Depends(get_db)):
-    db_movie = db.query(Movie).filter(Movie.id == movie_id).first()
-    if not db_movie:
-        raise HTTPException(status_code=404, detail="Movie not found")
-    reviews = db.query(Review).filter(Review.movie_id == db_movie.id).all()
-    return reviews
+@app.get("/reviews/{review_id}")
+def get_review_by_id(review_id: int, db: Session = Depends(get_db)):
+    review = db.query(Review).filter(Review.id == review_id).first()
+    if not review:
+        raise HTTPException(status_code=404, detail="Review not found")
+    return review
 
 @app.get("/movies/{title}/reviews/")
 def get_reviews_by_title(title: str, db: Session = Depends(get_db)):
@@ -231,6 +251,7 @@ def update_review(review_id: int, review: ReviewCreate, db: Session = Depends(ge
     db_review.content = review.content
     db_review.rating = review.rating
     db.commit()
+    db.refresh(db_review)  
     return db_review
 
 @app.delete("/reviews/{review_id}")
