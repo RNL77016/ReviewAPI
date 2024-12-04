@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, File, UploadFile, Request
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship
 from pydantic import BaseModel, Field
@@ -14,6 +15,9 @@ DATABASE_URL = "sqlite:///./movies.db"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
+# Montar la carpeta 'images' para servir archivos estáticos
+app.mount("/images", StaticFiles(directory="images"), name="images")
 
 # Modelos de base de datos
 class User(Base):
@@ -133,7 +137,7 @@ def create_movie(
         year=movie.year,
         genre=movie.genre,
         rating=movie.rating,
-        image_url=image_path
+        image_url=f"/images/{image.filename}"
     )
     db.add(db_movie)
     db.commit()
@@ -143,6 +147,13 @@ def create_movie(
 @app.get("/movies/")
 def get_movies(db: Session = Depends(get_db)):
     return db.query(Movie).all()
+
+@app.get("/movies({movie_id}")
+def get_movie(movie_id: int, db: Session = Depends(get_db)):
+    movie = db.query(Movie).filter(Movie.id == movie_id).first()
+    if not movie:
+        raise HTTPException(status_code=404, detail="Movie not found")
+    return movie
 
 @app.get("/movies/title/{title}")
 def get_movie_by_title(title: str, db: Session = Depends(get_db)):
@@ -168,6 +179,7 @@ def update_movie(movie_id: int, movie: MovieCreate, db: Session = Depends(get_db
     db_movie.year = movie.year
     db_movie.genre = movie.genre
     db_movie.rating = movie.rating
+    db_movie.image_url = movie.image_url
     db.commit()
     return db_movie
 
@@ -190,6 +202,14 @@ def create_review(title: str, review: ReviewCreate, db: Session = Depends(get_db
     db.commit()
     db.refresh(db_review)
     return db_review
+
+app.get("/movies/{movie_id}/reviews/")
+def get_reviews_by_movie_id(movie_id: int, db: Session = Depends(get_db)):
+    db_movie = db.query(Movie).filter(Movie.id == movie_id).first()
+    if not db_movie:
+        raise HTTPException(status_code=404, detail="Movie not found")
+    reviews = db.query(Review).filter(Review.movie_id == db_movie.id).all()
+    return reviews
 
 @app.get("/movies/{title}/reviews/")
 def get_reviews_by_title(title: str, db: Session = Depends(get_db)):
