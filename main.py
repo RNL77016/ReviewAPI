@@ -1,11 +1,11 @@
-from fastapi import FastAPI, Depends, HTTPException, File, UploadFile
+from fastapi import FastAPI, Depends, HTTPException, File, UploadFile, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 import shutil
 import os
-
 
 app = FastAPI()
 
@@ -67,11 +67,23 @@ class MovieCreate(BaseModel):
     description: str
     year: int
     genre: str
-    rating: float
+    rating: float = Field(..., ge=1, le=10)
 
 class ReviewCreate(BaseModel):
     content: str
-    rating: float
+    rating: float = Field(..., ge=1, le=10)
+
+# Middleware para manejo global de excepciones
+@app.middleware("http")
+async def add_process_time_header(request: Request, call_next):
+    try:
+        response = await call_next(request)
+        return response
+    except Exception as exc:
+        return JSONResponse(
+            status_code=500,
+            content={"message": "An unexpected error occurred.", "details": str(exc)},
+        )
 
 # Endpoints de la API
 @app.post("/user/")
@@ -91,9 +103,9 @@ def login_user(user: UserLogin, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.email == user.email).first()
     if not db_user or db_user.password != user.password:
         return {
-            "userId": None,
+            "userId": 0,
             "isLogged": False,
-            "message": "Invalid email or password"
+            "message": "Usuario o contraseña incorrectos"
         }
     return {
         "userId": db_user.id,
@@ -107,11 +119,7 @@ def get_users(db: Session = Depends(get_db)):
 
 @app.post("/movies/")
 def create_movie(
-    title: str,
-    description: str,
-    year: int,
-    genre: str,
-    rating: float,
+    movie: MovieCreate,
     image: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
@@ -120,11 +128,11 @@ def create_movie(
         shutil.copyfileobj(image.file, buffer)
 
     db_movie = Movie(
-        title=title,
-        description=description,
-        year=year,
-        genre=genre,
-        rating=rating,
+        title=movie.title,
+        description=movie.description,
+        year=movie.year,
+        genre=movie.genre,
+        rating=movie.rating,
         image_url=image_path
     )
     db.add(db_movie)
@@ -204,3 +212,12 @@ def update_review(review_id: int, review: ReviewCreate, db: Session = Depends(ge
     db_review.rating = review.rating
     db.commit()
     return db_review
+
+@app.delete("/reviews/{review_id}")
+def delete_review(review_id: int, db: Session = Depends(get_db)):
+    db_review = db.query(Review).filter(Review.id == review_id).first()
+    if not db_review:
+        raise HTTPException(status_code=404, detail="Review not found")
+    db.delete(db_review)
+    db.commit()
+    return {"detail": "Review deleted"}
