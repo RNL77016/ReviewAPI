@@ -121,6 +121,13 @@ def login_user(user: UserLogin, db: Session = Depends(get_db)):
 def get_users(db: Session = Depends(get_db)):
     return db.query(User).all()
 
+@app.get("/users/{user_id}")
+def get_user(user_id: int, db: Session = Depends(get_db)):
+    db_user = db.query(User).filter(User.id == user_id).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return db_user
+
 @app.post("/movies/")
 def create_movie(
     title: str = Form(...),
@@ -262,3 +269,5 @@ def delete_review(review_id: int, db: Session = Depends(get_db)):
     db.delete(db_review)
     db.commit()
     return {"detail": "Review deleted"}
+
+    
