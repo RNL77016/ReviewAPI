@@ -1,12 +1,9 @@
-from fastapi import FastAPI, Depends, HTTPException, File, UploadFile, Request, Form
+from fastapi import FastAPI, Depends, HTTPException, Request, Form
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-import shutil
-import os
 
 app = FastAPI()
 
@@ -15,9 +12,6 @@ DATABASE_URL = "sqlite:///./movies.db"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
-
-# Montar la carpeta 'images' para servir archivos estáticos
-app.mount("/images", StaticFiles(directory="images"), name="images")
 
 # Modelos de base de datos
 class User(Base):
@@ -72,6 +66,7 @@ class MovieCreate(BaseModel):
     year: int
     genre: str
     rating: float = Field(..., ge=1, le=10)
+    image_url: str  # El campo ahora es un string simple
 
 class ReviewCreate(BaseModel):
     content: str
@@ -129,29 +124,14 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
     return db_user
 
 @app.post("/movies/")
-def create_movie(
-    request: Request,
-    title: str = Form(...),
-    description: str = Form(...),
-    year: int = Form(...),
-    genre: str = Form(...),
-    rating: float = Form(..., ge=1, le=10),
-    image: UploadFile = File(...),
-    db: Session = Depends(get_db)
-):
-    image_path = f"images/{image.filename}"
-    with open(image_path, "wb") as buffer:
-        shutil.copyfileobj(image.file, buffer)
-
-    image_url = f"{request.url.scheme}://{request.client.host}:{request.url.port}/images/{image.filename}"
-
+def create_movie(movie: MovieCreate, db: Session = Depends(get_db)):
     db_movie = Movie(
-        title=title,
-        description=description,
-        year=year,
-        genre=genre,
-        rating=rating,
-        image_url=image_url
+        title=movie.title,
+        description=movie.description,
+        year=movie.year,
+        genre=movie.genre,
+        rating=movie.rating,
+        image_url=movie.image_url
     )
     db.add(db_movie)
     db.commit()
@@ -184,32 +164,17 @@ def get_movie_by_genre(genre: str, db: Session = Depends(get_db)):
     return movies
 
 @app.put("/movies/{movie_id}")
-def update_movie(
-    request: Request,
-    movie_id: int,
-    title: str = Form(...),
-    description: str = Form(...),
-    year: int = Form(...),
-    genre: str = Form(...),
-    rating: float = Form(..., ge=1, le=10),
-    image: UploadFile = File(None),
-    db: Session = Depends(get_db)
-):
+def update_movie(movie_id: int, movie: MovieCreate, db: Session = Depends(get_db)):
     db_movie = db.query(Movie).filter(Movie.id == movie_id).first()
     if not db_movie:
         raise HTTPException(status_code=404, detail="Movie not found")
 
-    db_movie.title = title
-    db_movie.description = description
-    db_movie.year = year
-    db_movie.genre = genre
-    db_movie.rating = rating
-
-    if image:
-        image_path = f"images/{image.filename}"
-        with open(image_path, "wb") as buffer:
-            shutil.copyfileobj(image.file, buffer)
-        db_movie.image_url = f"{request.url.scheme}://{request.client.host}:{request.url.port}/images/{image.filename}"
+    db_movie.title = movie.title
+    db_movie.description = movie.description
+    db_movie.year = movie.year
+    db_movie.genre = movie.genre
+    db_movie.rating = movie.rating
+    db_movie.image_url = movie.image_url
 
     db.commit()
     db.refresh(db_movie)
@@ -273,5 +238,3 @@ def delete_review(review_id: int, db: Session = Depends(get_db)):
     db.delete(db_review)
     db.commit()
     return {"detail": "Review deleted"}
-
-    
