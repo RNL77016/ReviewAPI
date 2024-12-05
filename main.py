@@ -130,6 +130,7 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
 
 @app.post("/movies/")
 def create_movie(
+    request: Request,
     title: str = Form(...),
     description: str = Form(...),
     year: int = Form(...),
@@ -142,13 +143,15 @@ def create_movie(
     with open(image_path, "wb") as buffer:
         shutil.copyfileobj(image.file, buffer)
 
+    image_url = f"{request.url.scheme}://{request.client.host}:{request.url.port}/images/{image.filename}"
+
     db_movie = Movie(
         title=title,
         description=description,
         year=year,
         genre=genre,
         rating=rating,
-        image_url=f"/images/{image.filename}"
+        image_url=image_url
     )
     db.add(db_movie)
     db.commit()
@@ -159,7 +162,7 @@ def create_movie(
 def get_movies(db: Session = Depends(get_db)):
     return db.query(Movie).all()
 
-@app.get("/movies({movie_id}")
+@app.get("/movies/{movie_id}")
 def get_movie(movie_id: int, db: Session = Depends(get_db)):
     movie = db.query(Movie).filter(Movie.id == movie_id).first()
     if not movie:
@@ -182,6 +185,7 @@ def get_movie_by_genre(genre: str, db: Session = Depends(get_db)):
 
 @app.put("/movies/{movie_id}")
 def update_movie(
+    request: Request,
     movie_id: int,
     title: str = Form(...),
     description: str = Form(...),
@@ -205,7 +209,7 @@ def update_movie(
         image_path = f"images/{image.filename}"
         with open(image_path, "wb") as buffer:
             shutil.copyfileobj(image.file, buffer)
-        db_movie.image_url = f"/images/{image.filename}"
+        db_movie.image_url = f"{request.url.scheme}://{request.client.host}:{request.url.port}/images/{image.filename}"
 
     db.commit()
     db.refresh(db_movie)
